@@ -30,21 +30,22 @@ Clone the repository, set up the virtual environment, and install the required p
 
 ## **Store Your API Keys**
 
-1. Create a `.env` file in the root directory of the project.
+1. Copy `.env.example` to `.env` in the root directory of the project.
 2. Add your API keys and environment variables to the `.env` file:
     ```plaintext
-    OPENAI_API_KEY=your_openai_api_key
+    OPENROUTER_API_KEY=your_openrouter_api_key
+    OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+    OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash
     SERPAPI_API_KEY=your_serpapi_api_key
-    SENDGRID_API_KEY=your_sendgrid_api_key
+    SENDGRID_API_KEY=your_sendgrid_api_key  # optional; only for email sending
 
     # Observability variables
-    LANGCHAIN_API_KEY=your_langchain_api_key
-    LANGCHAIN_TRACING_V2=true
+    LANGCHAIN_TRACING_V2=false
+    LANGCHAIN_API_KEY=your_langchain_api_key  # optional
     LANGCHAIN_PROJECT=ai_travel_agent
     ```
 
-Make sure to replace the placeholders (`your_openai_api_key`, `your_serpapi_api_key`, `your_langchain_api_key`, `your_sendgrid_api_key`) with your actual keys.
-This version includes the necessary environment variables for OpenAI, SERPAPI, LangChain, and SendGrid and the LANGCHAIN_TRACING_V2 and LANGCHAIN_PROJECT configurations.
+OpenRouter is used through the OpenAI-compatible API. Obtain an OpenRouter key at https://openrouter.ai/keys. Flight and hotel searches require a **SerpAPI** key at https://serpapi.com/manage-api-key; a Serper.dev key is not interchangeable. SendGrid is only needed if you use the email feature. LangSmith tracing is optional and disabled by default.
 
 ### How to Run the Chatbot
 To start the chatbot, run the following command:
