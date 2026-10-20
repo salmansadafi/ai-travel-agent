@@ -50,8 +50,13 @@ OpenRouter is used through the OpenAI-compatible API. Obtain an OpenRouter key a
 ### How to Run the Chatbot
 To start the chatbot, run the following command:
 ```
-streamlit run app.py
+streamlit run app.py --server.port 8502
 ```
+On Windows, from the repository folder, you can run it with the project environment directly:
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app.py --server.port 8502
+```
+Port `8502` avoids colliding with another local Streamlit app using the default port.
 
 ### Using the Chatbot
 Once launched, simply enter your travel request. For example:
