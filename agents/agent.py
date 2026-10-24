@@ -19,6 +19,9 @@ from agents.tools.hotels_finder import hotels_finder
 _ = load_dotenv()
 
 CURRENT_YEAR = datetime.datetime.now().year
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+OPENROUTER_BASE_URL = os.getenv('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
+OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-v4.1-flash')
 
 
 class AgentState(TypedDict):
@@ -123,7 +126,14 @@ class Agent:
 
     def __init__(self):
         self._tools = {t.name: t for t in TOOLS}
-        self._tools_llm = ChatOpenAI(model='gpt-4o').bind_tools(TOOLS)
+        if not OPENROUTER_API_KEY:
+            raise RuntimeError('Set OPENROUTER_API_KEY in the project .env file.')
+
+        self._tools_llm = ChatOpenAI(
+            model=OPENROUTER_MODEL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+        ).bind_tools(TOOLS)
 
         builder = StateGraph(AgentState)
         builder.add_node('call_tools_llm', self.call_tools_llm)
@@ -148,7 +158,12 @@ class Agent:
 
     def email_sender(self, state: AgentState):
         print('Sending email')
-        email_llm = ChatOpenAI(model='gpt-4o', temperature=0.1)  # Instantiate another LLM
+        email_llm = ChatOpenAI(
+            model=OPENROUTER_MODEL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+            temperature=0.1,
+        )
         email_message = [SystemMessage(content=EMAILS_SYSTEM_PROMPT), HumanMessage(content=state['messages'][-1].content)]
         email_response = email_llm.invoke(email_message)
         print('Email content:', email_response.content)
