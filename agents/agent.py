@@ -1,6 +1,7 @@
 # pylint: disable = http-used,print-used,no-self-use
 
 import datetime
+import json
 import operator
 import os
 from typing import Annotated, TypedDict
@@ -33,9 +34,10 @@ TOOLS_SYSTEM_PROMPT = f"""You are a smart travel agency. Use the tools to look u
     Only look up information when you are sure of what you want.
     The current year is {CURRENT_YEAR}.
     If you need to look up some information before asking a follow up question, you are allowed to do that!
-    I want to have in your output links to hotels websites and flights websites (if possible).
-    I want to have as well the logo of the hotel and the logo of the airline company (if possible).
-    In your output always include the price of the flight and the price of the hotel and the currency as well (if possible).
+    Summarize flight options briefly and never confuse outbound with return flights.
+    The app displays structured flight and hotel cards below your answer, including available images.
+    Do not invent or repeat details already shown in those cards.
+    If a tool returns an error or missing results, state that clearly rather than presenting placeholders.
     for example for hotels-
     Rate: $581 per night
     Total: $3,488
@@ -125,10 +127,10 @@ Expected Output:
 class Agent:
 
     def __init__(self):
-        self._tools = {t.name: t for t in TOOLS}
         if not OPENROUTER_API_KEY:
             raise RuntimeError('Set OPENROUTER_API_KEY in the project .env file.')
 
+        self._tools = {t.name: t for t in TOOLS}
         self._tools_llm = ChatOpenAI(
             model=OPENROUTER_MODEL,
             api_key=OPENROUTER_API_KEY,
@@ -189,12 +191,22 @@ class Agent:
         tool_calls = state['messages'][-1].tool_calls
         results = []
         for t in tool_calls:
-            print(f'Calling: {t}')
+            safe_call = {key: value for key, value in t.items() if key != 'id'}
+            if isinstance(safe_call.get('args'), dict):
+                safe_call['args'] = dict(safe_call['args'])
+                params = safe_call['args'].get('params')
+                if isinstance(params, dict):
+                    safe_call['args']['params'] = {
+                        key: value for key, value in params.items()
+                        if key not in ('api_key', 'departure_token', 'booking_token')
+                    }
+            print(f'Calling: {safe_call}')
             if not t['name'] in self._tools:  # check for bad tool name from LLM
                 print('\n ....bad tool name....')
                 result = 'bad tool name, retry'  # instruct LLM to retry if bad
             else:
                 result = self._tools[t['name']].invoke(t['args'])
-            results.append(ToolMessage(tool_call_id=t['id'], name=t['name'], content=str(result)))
+            content = json.dumps(result, ensure_ascii=False, default=str) if isinstance(result, (dict, list)) else str(result)
+            results.append(ToolMessage(tool_call_id=t['id'], name=t['name'], content=content))
         print('Back to the model!')
         return {'messages': results}
