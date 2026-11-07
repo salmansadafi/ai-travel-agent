@@ -6,6 +6,8 @@ import serpapi
 from langchain.pydantic_v1 import BaseModel, Field
 from langchain_core.tools import tool
 
+from agents.tools.serpapi_utils import safe_serpapi_error
+
 
 class FlightsInput(BaseModel):
     departure_airport: Optional[str] = Field(description='Departure airport code (IATA)')
@@ -20,6 +22,13 @@ class FlightsInput(BaseModel):
 
 class FlightsInputSchema(BaseModel):
     params: FlightsInput
+
+
+def _public_flight(flight):
+    return {
+        key: value for key, value in flight.items()
+        if key not in ('departure_token', 'booking_token')
+    }
 
 
 @tool(args_schema=FlightsInputSchema)
@@ -50,7 +59,38 @@ def flights_finder(params: FlightsInput):
 
     try:
         search = serpapi.search(params)
-        results = search.data['best_flights']
+        outbound_options = search.data.get('best_flights', [])
+        if len(outbound_options) < 3:
+            outbound_options = outbound_options + search.data.get('other_flights', [])
+        outbound_options = outbound_options[:3]
+        if not outbound_options:
+            return {'error': 'SerpAPI returned no outbound flight options.'}
+
+        if not params['return_date']:
+            return {'outbound_flights': [_public_flight(flight) for flight in outbound_options]}
+
+        trip_options = []
+        for outbound_flight in outbound_options:
+            departure_token = outbound_flight.get('departure_token')
+            if not departure_token:
+                trip_options.append({
+                    'outbound_flight': _public_flight(outbound_flight),
+                    'return_flights': [],
+                    'warning': 'No departure token was provided for this outbound flight.',
+                })
+                continue
+
+            return_params = {**params, 'departure_token': departure_token}
+            return_search = serpapi.search(return_params)
+            return_flights = return_search.data.get('best_flights', [])
+            if not return_flights:
+                return_flights = return_search.data.get('other_flights', [])
+
+            trip_options.append({
+                'outbound_flight': _public_flight(outbound_flight),
+                'return_flights': [_public_flight(flight) for flight in return_flights[:3]],
+            })
+
+        return {'trip_options': trip_options}
     except Exception as e:
-        results = str(e)
-    return results
+        return safe_serpapi_error(e)
