@@ -5,6 +5,8 @@ import serpapi
 from langchain.pydantic_v1 import BaseModel, Field
 from langchain_core.tools import tool
 
+from agents.tools.serpapi_utils import safe_serpapi_error
+
 # from pydantic import BaseModel, Field
 
 
@@ -49,6 +51,9 @@ def hotels_finder(params: HotelsInput):
         'hotel_class': params.hotel_class
     }
 
-    search = serpapi.search(params)
-    results = search.data
-    return results['properties'][:5]
+    try:
+        search = serpapi.search(params)
+        results = search.data
+        return results['properties'][:5]
+    except Exception as e:
+        return safe_serpapi_error(e)
