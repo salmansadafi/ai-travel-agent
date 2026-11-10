@@ -64,6 +64,50 @@ def _render_flight_leg(flight):
         st.image(segments[0]['airline_logo'], width=70)
     st.markdown(_flight_summary(flight))
 
+def _render_flight_results(data):
+    st.subheader('✈️ Flight options')
+    if isinstance(data, str):
+        st.warning(data)
+        return
+    if data.get('error'):
+        st.warning(data['error'])
+        return
+
+    trip_options = data.get('trip_options', [])
+    if trip_options:
+        st.caption('Each return option is matched to the outbound flight in the same card.')
+        for index, trip in enumerate(trip_options, start=1):
+            with st.container(border=True):
+                st.markdown(f'#### Complete trip option {index}')
+                outbound_col, return_col = st.columns(2)
+                with outbound_col:
+                    st.markdown('**Outbound**')
+                    _render_flight_leg(trip.get('outbound_flight', {}))
+                with return_col:
+                    st.markdown('**Return**')
+                    returns = trip.get('return_flights', [])
+                    if returns:
+                        _render_flight_leg(returns[0])
+                        if len(returns) > 1:
+                            with st.expander(f'{len(returns) - 1} more return choices'):
+                                for flight in returns[1:]:
+                                    _render_flight_leg(flight)
+                                    st.divider()
+                    else:
+                        st.warning(
+                            trip.get('warning', 'No return flight was found for this outbound option.')
+                        )
+        return
+
+    outbound_flights = data.get('outbound_flights', [])
+    if outbound_flights:
+        for index, flight in enumerate(outbound_flights, start=1):
+            st.markdown(f'**Outbound option {index}**')
+            _render_flight_leg(flight)
+            st.divider()
+    else:
+        st.info('No flight options were returned.')
+
 def render_custom_css():
     st.markdown(
         '''
