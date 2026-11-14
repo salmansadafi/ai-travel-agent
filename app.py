@@ -108,6 +108,54 @@ def _render_flight_results(data):
     else:
         st.info('No flight options were returned.')
 
+def _hotel_image(hotel):
+    if hotel.get('thumbnail'):
+        return hotel['thumbnail']
+    for image in hotel.get('images', []):
+        if isinstance(image, dict):
+            url = image.get('thumbnail') or image.get('original_image')
+            if url:
+                return url
+    return None
+
+def _render_hotel_results(hotels):
+    st.subheader('🏨 Hotel options')
+    if isinstance(hotels, str):
+        st.warning(hotels)
+        return
+    if not hotels:
+        st.info('No hotel options were returned.')
+        return
+
+    columns = st.columns(2)
+    for index, hotel in enumerate(hotels):
+        with columns[index % len(columns)]:
+            with st.container(border=True):
+                image = _hotel_image(hotel)
+                if image:
+                    st.image(image, use_column_width=True)
+                st.markdown(f"### {hotel.get('name', 'Hotel')}")
+                rating = hotel.get('overall_rating')
+                if rating is not None:
+                    reviews = hotel.get('reviews')
+                    review_text = f' · {reviews:,} reviews' if isinstance(reviews, int) else ''
+                    st.write(f'⭐ {rating}/5{review_text}')
+                rate = hotel.get('rate_per_night', {})
+                total = hotel.get('total_rate', {})
+                nightly = rate.get('lowest') if isinstance(rate, dict) else None
+                total_price = total.get('lowest') if isinstance(total, dict) else None
+                if nightly:
+                    st.write(f'**Per night:** {nightly}')
+                if total_price:
+                    st.write(f'**Total stay:** {total_price}')
+                coordinates = hotel.get('gps_coordinates', {})
+                if coordinates.get('latitude') is not None and coordinates.get('longitude') is not None:
+                    map_url = (
+                        'https://www.google.com/maps/search/?api=1&query='
+                        f'{coordinates["latitude"]},{coordinates["longitude"]}'
+                    )
+                    st.link_button('View location', map_url)
+
 def render_custom_css():
     st.markdown(
         '''
