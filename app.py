@@ -1,16 +1,19 @@
 # pylint: disable = invalid-name
 import os
 import uuid
+import json
 
 import streamlit as st
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 
 from agents.agent import Agent
+
 
 def populate_envs(sender_email, receiver_email, subject):
     os.environ['FROM_EMAIL'] = sender_email
     os.environ['TO_EMAIL'] = receiver_email
     os.environ['EMAIL_SUBJECT'] = subject
+
 
 def send_email(sender_email, receiver_email, subject, thread_id):
     try:
@@ -24,9 +27,11 @@ def send_email(sender_email, receiver_email, subject, thread_id):
     except Exception as e:
         st.error(f'Error sending email: {e}')
 
+
 def initialize_agent():
     if 'agent' not in st.session_state:
         st.session_state.agent = Agent()
+
 
 def _flight_summary(flight):
     segments = flight.get('flights', [])
@@ -58,11 +63,13 @@ def _flight_summary(flight):
         summary += f"  \n**Price:** ${flight['price']}"
     return summary
 
+
 def _render_flight_leg(flight):
     segments = flight.get('flights', [])
     if segments and segments[0].get('airline_logo'):
         st.image(segments[0]['airline_logo'], width=70)
     st.markdown(_flight_summary(flight))
+
 
 def _render_flight_results(data):
     st.subheader('✈️ Flight options')
@@ -108,6 +115,7 @@ def _render_flight_results(data):
     else:
         st.info('No flight options were returned.')
 
+
 def _hotel_image(hotel):
     if hotel.get('thumbnail'):
         return hotel['thumbnail']
@@ -117,6 +125,7 @@ def _hotel_image(hotel):
             if url:
                 return url
     return None
+
 
 def _render_hotel_results(hotels):
     st.subheader('🏨 Hotel options')
@@ -156,6 +165,21 @@ def _render_hotel_results(hotels):
                     )
                     st.link_button('View location', map_url)
 
+
+def _render_tool_results(messages):
+    for message in messages:
+        if not isinstance(message, ToolMessage):
+            continue
+        try:
+            data = json.loads(message.content)
+        except (TypeError, json.JSONDecodeError):
+            data = message.content
+        if message.name == 'flights_finder':
+            _render_flight_results(data)
+        elif message.name == 'hotels_finder':
+            _render_hotel_results(data)
+
+
 def render_custom_css():
     st.markdown(
         '''
@@ -193,6 +217,7 @@ def render_custom_css():
         </style>
         ''', unsafe_allow_html=True)
 
+
 def render_ui():
     st.markdown('<div class="center-container">', unsafe_allow_html=True)
     st.markdown('<div class="main-title">✈️🌍 AI Travel Agent 🏨🗺️</div>', unsafe_allow_html=True)
@@ -209,6 +234,7 @@ def render_ui():
 
     return user_input
 
+
 def process_query(user_input):
     if user_input:
         try:
@@ -221,14 +247,17 @@ def process_query(user_input):
             result = st.session_state.agent.graph.invoke({'messages': messages}, config=config)
 
             st.subheader('Travel Information')
-            st.write(result['messages'][-1].content)
+            final_message = result['messages'][-1]
+            st.markdown(final_message.content)
+            _render_tool_results(result['messages'])
 
-            st.session_state.travel_info = result['messages'][-1].content
+            st.session_state.travel_info = final_message.content
 
         except Exception as e:
             st.error(f'Error: {e}')
     else:
         st.error('Please enter a travel query.')
+
 
 def render_email_form():
     send_email_option = st.radio('Do you want to send this information via email?', ('No', 'Yes'))
@@ -245,6 +274,7 @@ def render_email_form():
             else:
                 st.error('Please fill out all email fields.')
 
+
 def main():
     initialize_agent()
     render_custom_css()
@@ -255,6 +285,7 @@ def main():
 
     if 'travel_info' in st.session_state:
         render_email_form()
+
 
 if __name__ == '__main__':
     main()
