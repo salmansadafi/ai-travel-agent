@@ -1,12 +1,19 @@
 # pylint: disable = invalid-name
-import os
-import uuid
 import json
+import os
+import re
+import uuid
 
 import streamlit as st
 from langchain_core.messages import HumanMessage, ToolMessage
 
 from agents.agent import Agent
+
+PERSIAN_TEXT_RE = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]')
+
+
+def is_persian_text(text):
+    return isinstance(text, str) and bool(PERSIAN_TEXT_RE.search(text))
 
 
 def populate_envs(sender_email, receiver_email, subject):
@@ -180,59 +187,78 @@ def _render_tool_results(messages):
             _render_hotel_results(data)
 
 
-def render_custom_css():
+def render_custom_css(user_input=''):
+    is_rtl = is_persian_text(user_input)
+    direction = 'rtl' if is_rtl else 'ltr'
+    alignment = 'right' if is_rtl else 'left'
     st.markdown(
-        '''
+        f'''
         <style>
-        .main-title {
+        .main-title {{
             font-size: 2.5em;
             color: #333;
             text-align: center;
             margin-bottom: 0.5em;
             font-weight: bold;
-        }
-        .sub-title {
+        }}
+        .sub-title {{
             font-size: 1.2em;
             color: #333;
-            text-align: left;
+            text-align: {alignment};
             margin-bottom: 0.5em;
-        }
-        .center-container {
+            direction: {direction};
+        }}
+        .center-container {{
             display: flex;
             flex-direction: column;
             align-items: center;
             width: 100%;
-        }
-        .query-box {
+        }}
+        .query-box {{
             width: 80%;
             max-width: 600px;
             margin-top: 0.5em;
             margin-bottom: 1em;
-        }
-        .query-container {
+        }}
+        .query-container {{
             width: 80%;
             max-width: 600px;
             margin: 0 auto;
-        }
+        }}
+        div[data-testid="stAppViewContainer"],
+        .stApp, .stApp > div, .stMain, .stMarkdownContainer, .stTextArea textarea, .stTextInput input, .stSelectbox div, .stRadio div {{
+            direction: {direction};
+            text-align: {alignment};
+        }}
+        .stTextArea textarea, .stTextInput input {{
+            text-align: {alignment};
+        }}
         </style>
         ''', unsafe_allow_html=True)
 
 
 def render_ui():
+    is_rtl = is_persian_text(st.session_state.get('query', ''))
     st.markdown('<div class="center-container">', unsafe_allow_html=True)
     st.markdown('<div class="main-title">✈️🌍 AI Travel Agent 🏨🗺️</div>', unsafe_allow_html=True)
     st.markdown('<div class="query-container">', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">Enter your travel query and get flight and hotel information:</div>', unsafe_allow_html=True)
-    user_input = st.text_area(
-        'Travel Query',
-        height=200,
-        key='query',
-        placeholder='Type your travel query here...',
-    )
+    sub_title = 'درخواست سفر خود را بنویسید و اطلاعات پرواز و هتل را دریافت کنید:'
+    if not is_rtl:
+        sub_title = 'Enter your travel query and get flight and hotel information:'
+
+    st.markdown(f'<div class="sub-title">{sub_title}</div>', unsafe_allow_html=True)
+    with st.form(key='travel_query_form'):
+        user_input = st.text_area(
+            'Travel Query / درخواست سفر',
+            height=200,
+            key='query',
+            placeholder='Type your travel query here... / توضیح سفر خود را اینجا بنویسید...',
+        )
+        submitted = st.form_submit_button('Get Travel Information / دریافت اطلاعات سفر')
     st.markdown('</div>', unsafe_allow_html=True)
     st.sidebar.image('images/ai-travel.png', caption='AI Travel Assistant')
 
-    return user_input
+    return user_input, submitted
 
 
 def process_query(user_input):
@@ -277,10 +303,10 @@ def render_email_form():
 
 def main():
     initialize_agent()
-    render_custom_css()
-    user_input = render_ui()
+    render_custom_css(st.session_state.get('query', ''))
+    user_input, submitted = render_ui()
 
-    if st.button('Get Travel Information'):
+    if submitted:
         process_query(user_input)
 
     if 'travel_info' in st.session_state:
