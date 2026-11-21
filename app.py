@@ -274,7 +274,10 @@ def process_query(user_input):
 
             st.subheader('Travel Information')
             final_message = result['messages'][-1]
-            st.markdown(final_message.content)
+            if is_persian_text(final_message.content):
+                st.markdown(f"<div dir='rtl' style='text-align: right;'>{final_message.content}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(final_message.content)
             _render_tool_results(result['messages'])
 
             st.session_state.travel_info = final_message.content
